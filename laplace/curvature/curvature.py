@@ -52,7 +52,7 @@ class CurvatureInterface:
         dict_key_x: str = "input_ids",
         dict_key_y: str = "labels",
     ):
-        assert likelihood in [Likelihood.REGRESSION, Likelihood.CLASSIFICATION]
+        assert likelihood in [Likelihood.REGRESSION, Likelihood.CLASSIFICATION, Likelihood.BINARY]
         self.likelihood: Likelihood | str = likelihood
         self.model: nn.Module = model
         self.last_layer: bool = last_layer
