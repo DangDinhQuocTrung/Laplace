@@ -73,7 +73,7 @@ class RunningBCEMetric(Metric):
         probs = probs.view(-1, probs.shape[-1])
         targets = targets.view(-1)
 
-        self.bce_sum += F.bce_loss(probs, targets, reduction="sum")
+        self.bce_sum += F.binary_cross_entropy(probs, targets, reduction="sum")
         self.n_valid_labels += targets.shape[0]
 
     def compute(self) -> torch.Tensor:
