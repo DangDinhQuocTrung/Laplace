@@ -41,3 +41,40 @@ class RunningNLLMetric(Metric):
 
     def compute(self) -> torch.Tensor:
         return self.nll_sum / self.n_valid_labels
+
+
+class RunningBCEMetric(Metric):
+    """
+    BCE metrics that
+
+    Parameters
+    ----------
+    ignore_index: int, default = -100
+        which class label to ignore when computing the NLL loss
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.add_state("bce_sum", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state(
+            "n_valid_labels", default=torch.tensor(0.0), dist_reduce_fx="sum"
+        )
+
+    def update(self, probs: torch.Tensor, targets: torch.Tensor) -> None:
+        """
+        Parameters
+        ----------
+        probs: torch.Tensor
+            probability tensor of shape (..., n_classes)
+
+        targets: torch.Tensor
+            integer tensor of shape (...)
+        """
+        probs = probs.view(-1, probs.shape[-1])
+        targets = targets.view(-1)
+
+        self.bce_sum += F.bce_loss(probs, targets, reduction="sum")
+        self.n_valid_labels += targets.shape[0]
+
+    def compute(self) -> torch.Tensor:
+        return self.bce_sum / self.n_valid_labels

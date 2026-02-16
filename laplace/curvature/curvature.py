@@ -4,7 +4,7 @@ from typing import Any, Callable, MutableMapping
 
 import torch
 from torch import nn
-from torch.nn import CrossEntropyLoss, MSELoss
+from torch.nn import CrossEntropyLoss, MSELoss, BCEWithLogitsLoss
 
 from laplace.utils import Kron, Likelihood
 
@@ -65,6 +65,11 @@ class CurvatureInterface:
                 MSELoss(reduction="sum")
             )
             self.factor: float = 0.5
+        elif likelihood == "binary":
+            self.lossfunc: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = (
+                BCEWithLogitsLoss(reduction="sum")
+            )
+            self.factor: float = 1.0
         else:
             self.lossfunc: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = (
                 CrossEntropyLoss(reduction="sum")
@@ -349,6 +354,10 @@ class GGNInterface(CurvatureInterface):
                 # N(y | f, 1)
                 y_sample = f + torch.randn(f.shape, device=f.device, dtype=f.dtype)
                 grad_sample = f - y_sample  # functional MSE grad
+            elif self.likelihood == "binary":
+                y_sample = torch.distributions.Bernoulli(logits=f).sample()
+                p = torch.sigmoid(f)
+                grad_sample = p - y_sample
             else:  # classification with softmax
                 y_sample = torch.distributions.Multinomial(logits=f).sample()
                 # First functional derivative of the loglik is p - y
@@ -364,6 +373,7 @@ class GGNInterface(CurvatureInterface):
         return F
 
     def _get_functional_hessian(self, f: torch.Tensor) -> torch.Tensor | None:
+        assert self.likelihood != "binary"
         if self.likelihood == "regression":
             return None
         else:

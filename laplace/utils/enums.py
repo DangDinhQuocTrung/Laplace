@@ -45,6 +45,9 @@ class Likelihood(str, Enum):
     REWARD_MODELING = "reward_modeling"
     """Bradley-Terry likelihood, for preference learning / reward modeling."""
 
+    BINARY = "binary"
+    """Binary classification, assuming `loss_fn = nn.BCELoss()`."""
+
 
 class PredType(str, Enum):
     """Valid options for `pred_type`."""
@@ -98,5 +101,5 @@ class PriorStructure(str, Enum):
     """Scalar prior precision \\( \\tau \\in \\mathbb{R}^p \\)."""
 
     LAYERWISE = "layerwise"
-    """Layerwise prior precision, i.e. a single scalar prior precision for each block 
+    """Layerwise prior precision, i.e. a single scalar prior precision for each block
     (corresponding to each the NN's layer) of the diagonal prior-precision matrix.."""

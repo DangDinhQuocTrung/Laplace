@@ -29,7 +29,7 @@ from laplace.utils.enums import (
     TuningMethod,
 )
 from laplace.utils.matrix import Kron, KronDecomposed
-from laplace.utils.metrics import RunningNLLMetric
+from laplace.utils.metrics import RunningNLLMetric, RunningBCEMetric
 from laplace.utils.utils import (
     fix_prior_prec_structure,
     invsqrt_precision,
@@ -491,10 +491,10 @@ class BaseLaplace:
 
             if loss is None:
                 loss = (
-                    torchmetrics.MeanSquaredError(num_outputs=self.n_outputs).to(
-                        self._device
-                    )
+                    torchmetrics.MeanSquaredError(num_outputs=self.n_outputs).to(self._device)
                     if likelihood == Likelihood.REGRESSION
+                    else RunningBCEMetric().to(self._device)
+                    if likelihood == Likelihood.BINARY
                     else RunningNLLMetric().to(self._device)
                 )
 
@@ -830,6 +830,8 @@ class BaseLaplace:
 
         if self.likelihood == Likelihood.REGRESSION:
             return f_samples
+        elif self.likelihood == Likelihood.BINARY:
+            return torch.sigmoid(f_samples)
         else:
             return torch.softmax(f_samples, dim=-1)
 
@@ -973,7 +975,7 @@ class ParametricLaplace(BaseLaplace):
                 X, y = data
                 X, y = X.to(self._device), y.to(self._device)
 
-            if self.likelihood == Likelihood.REGRESSION and y.ndim != out.ndim:
+            if self.likelihood in [Likelihood.REGRESSION, Likelihood.BINARY] and y.ndim != out.ndim:
                 raise ValueError(
                     f"The model's output has {out.ndim} dims but "
                     f"the target has {y.ndim} dims."
@@ -1204,7 +1206,10 @@ class ParametricLaplace(BaseLaplace):
             if likelihood == Likelihood.REGRESSION:
                 samples = self._nn_predictive_samples(x, n_samples, **model_kwargs)
                 return samples.mean(dim=0), samples.var(dim=0)
-            else:  # classification; the average is computed online
+            elif likelihood == Likelihood.BINARY:
+                return self._nn_predictive_classification(x, n_samples, **model_kwargs)
+            else:
+                # classification; the average is computed online
                 return self._nn_predictive_classification(x, n_samples, **model_kwargs)
 
     def functional_samples(
@@ -1358,7 +1363,6 @@ class ParametricLaplace(BaseLaplace):
 
         vector_to_parameters(self.mean, self.params)
         fs = torch.stack(fs)
-
         return fs
 
     def _nn_predictive_samples(
@@ -1372,7 +1376,8 @@ class ParametricLaplace(BaseLaplace):
 
         if self.likelihood == Likelihood.CLASSIFICATION:
             fs = torch.softmax(fs, dim=-1)
-
+        elif self.likelihood == Likelihood.BINARY:
+            fs = torch.sigmoid(fs)
         return fs
 
     def _nn_predictive_classification(
@@ -1387,10 +1392,12 @@ class ParametricLaplace(BaseLaplace):
             logits = self.model(
                 X.to(self._device) if isinstance(X, torch.Tensor) else X, **model_kwargs
             ).detach()
-            py += torch.softmax(logits, dim=-1) / n_samples
+            if self.likelihood == Likelihood.BINARY:
+                py += torch.sigmoid(logits) / n_samples
+            else:
+                py += torch.softmax(logits, dim=-1) / n_samples
 
         vector_to_parameters(self.mean, self.params)
-
         return py
 
     def functional_variance(self, Js: torch.Tensor) -> torch.Tensor:

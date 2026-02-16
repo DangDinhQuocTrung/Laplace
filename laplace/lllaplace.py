@@ -283,7 +283,8 @@ class LLLaplace(ParametricLaplace):
 
         if self.likelihood == Likelihood.CLASSIFICATION:
             fs = torch.softmax(fs, dim=-1)
-
+        elif self.likelihood == Likelihood.BINARY:
+            fs = torch.sigmoid(fs)
         return fs
 
     def _nn_predictive_classification(
@@ -308,10 +309,12 @@ class LLLaplace(ParametricLaplace):
                 # Used the cached features for the rest iterations
                 logits = self.model.last_layer(feats)
 
-            py += torch.softmax(logits.detach(), dim=-1) / n_samples
+            if self.likelihood == Likelihood.BINARY:
+                py += torch.sigmoid(logits.detach()) / n_samples
+            elif self.likelihood == Likelihood.CLASSIFICATION:
+                py += torch.softmax(logits.detach(), dim=-1) / n_samples
 
         vector_to_parameters(self.mean, self.model.last_layer.parameters())
-
         return py
 
     @property

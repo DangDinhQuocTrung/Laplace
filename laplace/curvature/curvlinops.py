@@ -157,7 +157,7 @@ class CurvlinopsGGN(CurvlinopsInterface, GGNInterface):
         super().__init__(
             model, likelihood, last_layer, subnetwork_indices, dict_key_x, dict_key_y
         )
-        self.stochastic = stochastic
+        self.stochastic = True if Likelihood(likelihood) == Likelihood.BINARY else stochastic
 
     @property
     def _kron_fisher_type(self) -> FisherType:
